@@ -439,12 +439,17 @@ def grpo_trainer_compute_loss(function_name, function):
         # https://github.com/huggingface/trl/blob/05bc43e960396581e458195b8388efe6b82cae1f/trl/trainer/grpo_trainer.py#L1328
         if self.beta != 0.0:
             if hasattr(model, 'disable_adapter'):
-                with torch.inference_mode(), model.disable_adapter():
-                    ref_per_token_logps = get_logps_func(model, input_ids, attention_mask, logits_to_keep)
+                try:
+                    with torch.inference_mode(), model.disable_adapter():
+                        ref_per_token_logps = get_logps_func(model, input_ids, attention_mask, logits_to_keep)
+                except ValueError:
+                    with torch.inference_mode():
+                        ref_per_token_logps = get_logps_func(model, input_ids, attention_mask, logits_to_keep)
             else:
                 with torch.inference_mode():
                     ref_per_token_logps = get_logps_func(model, input_ids, attention_mask, logits_to_keep)
         else:
+            # When beta is 0, we don't need reference probabilities
             ref_per_token_logps = None
         # per_token_kl = torch.exp(ref_per_token_logps - per_token_logps) - (ref_per_token_logps - per_token_logps) - 1
         # x - x.detach() allows for preserving gradients from x
