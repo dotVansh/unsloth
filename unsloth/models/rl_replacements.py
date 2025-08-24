@@ -494,42 +494,89 @@ def grpo_trainer_compute_loss(function_name, function):
                 logit_scale_divide = logit_scale_divide,
             )
         else:
-            if hasattr(self.args, "loss_type"):
-                loss, completion_length, mean_kl = grpo_accumulated_loss(
-                    trainer = self,
-                    input_ids = _input_ids,
-                    logits_to_keep = logits_to_keep,
-                    completion_mask = completion_mask,
-                    advantages = advantages,
-                    old_hidden_states = old_hidden_states,
-                    n_chunks = self.args.unsloth_num_chunks,
-                    loss_type = self.args.loss_type,
-                    epsilon_low = self.epsilon_low,
-                    epsilon_high = self.epsilon_high,
-                    max_completion_length = self.args.max_completion_length,
-                    delta = self.args.delta,
-                    temperature = self.args.temperature,
-                    logit_softcapping = logit_softcapping,
-                    logit_scale_multiply = logit_scale_multiply,
-                    logit_scale_divide = logit_scale_divide,
-                    attention_mask = attention_mask,
-                )
-            else:
-                # to ensure backwards compatibility with trl 0.15.2 and maybe even 0.17
-                loss, completion_length, mean_kl = grpo_accumulated_loss(
-                    trainer = self,
-                    input_ids = _input_ids,
-                    logits_to_keep = logits_to_keep,
-                    completion_mask = completion_mask,
-                    advantages = advantages,
-                    old_hidden_states = old_hidden_states,
-                    n_chunks = self.args.unsloth_num_chunks,
-                    temperature = self.args.temperature,
-                    logit_softcapping = logit_softcapping,
-                    logit_scale_multiply = logit_scale_multiply,
-                    logit_scale_divide = logit_scale_divide,
-                    attention_mask = attention_mask,
-                )
+            try:
+                if hasattr(self.args, "loss_type"):
+                    loss, completion_length, mean_kl = grpo_accumulated_loss(
+                        trainer = self,
+                        input_ids = _input_ids,
+                        logits_to_keep = logits_to_keep,
+                        completion_mask = completion_mask,
+                        advantages = advantages,
+                        old_hidden_states = old_hidden_states,
+                        n_chunks = self.args.unsloth_num_chunks,
+                        loss_type = self.args.loss_type,
+                        epsilon_low = self.epsilon_low,
+                        epsilon_high = self.epsilon_high,
+                        max_completion_length = self.args.max_completion_length,
+                        delta = self.args.delta,
+                        temperature = self.args.temperature,
+                        logit_softcapping = logit_softcapping,
+                        logit_scale_multiply = logit_scale_multiply,
+                        logit_scale_divide = logit_scale_divide,
+                        attention_mask = attention_mask,
+                    )
+                else:
+                    # to ensure backwards compatibility with trl 0.15.2 and maybe even 0.17
+                    loss, completion_length, mean_kl = grpo_accumulated_loss(
+                        trainer = self,
+                        input_ids = _input_ids,
+                        logits_to_keep = logits_to_keep,
+                        completion_mask = completion_mask,
+                        advantages = advantages,
+                        old_hidden_states = old_hidden_states,
+                        n_chunks = self.args.unsloth_num_chunks,
+                        temperature = self.args.temperature,
+                        logit_softcapping = logit_softcapping,
+                        logit_scale_multiply = logit_scale_multiply,
+                        logit_scale_divide = logit_scale_divide,
+                        attention_mask = attention_mask,
+                    )
+            except ValueError as e:
+                if "No adapter loaded" in str(e):
+                    # Handle case where no adapters are loaded in the accumulated loss function
+                    # Fall back to computing without reference policy (KL divergence will be 0)
+                    if hasattr(self.args, "loss_type"):
+                        # Create a mock version of grpo_accumulated_loss that doesn't use reference policy
+                        loss, completion_length, mean_kl = UnslothEfficientGRPO(
+                            trainer = self,
+                            input_ids = _input_ids,
+                            logits_to_keep = logits_to_keep,
+                            completion_mask = completion_mask,
+                            advantages = advantages,
+                            old_hidden_states = old_hidden_states,
+                            n_chunks = self.args.unsloth_num_chunks,
+                            loss_type = self.args.loss_type,
+                            epsilon_low = self.epsilon_low,
+                            epsilon_high = self.epsilon_high,
+                            max_completion_length = self.args.max_completion_length,
+                            delta = self.args.delta,
+                            temperature = self.args.temperature,
+                            logit_softcapping = logit_softcapping,
+                            logit_scale_multiply = logit_scale_multiply,
+                            logit_scale_divide = logit_scale_divide,
+                            attention_mask = attention_mask,
+                            beta = 0.0,  # Set beta to 0 to disable KL term
+                        )
+                    else:
+                        # to ensure backwards compatibility with trl 0.15.2 and maybe even 0.17
+                        loss, completion_length, mean_kl = UnslothEfficientGRPO(
+                            trainer = self,
+                            input_ids = _input_ids,
+                            logits_to_keep = logits_to_keep,
+                            completion_mask = completion_mask,
+                            advantages = advantages,
+                            old_hidden_states = old_hidden_states,
+                            n_chunks = self.args.unsloth_num_chunks,
+                            temperature = self.args.temperature,
+                            logit_softcapping = logit_softcapping,
+                            logit_scale_multiply = logit_scale_multiply,
+                            logit_scale_divide = logit_scale_divide,
+                            attention_mask = attention_mask,
+                            beta = 0.0,  # Set beta to 0 to disable KL term
+                        )
+                else:
+                    # Re-raise if it's a different ValueError
+                    raise
             pass
         pass
         # Log the metrics
